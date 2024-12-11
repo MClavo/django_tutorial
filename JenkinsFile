@@ -1,0 +1,61 @@
+pipeline {
+    environment {
+        IMAGEN = "prueba_jenkins"
+        LOGIN = 'USER_DOCKERHUB'
+    }
+    agent any
+    stages {
+        stage("Preparar_entorno") {
+            agent {
+                docker {
+                    image "python:3"
+                    args '-u root:root'
+                }
+            }
+            steps {
+                script {
+                    stage('Clonar_repo') {
+                        steps {
+                            sh 'https://github.com/MClavo/django_tutorial.git'
+                        }
+                    }
+                    stage('Instalar_dependencias') {
+                        steps {
+                            sh 'pip install -r repo/requirements.txt'
+                        }
+                    }
+                    stage('Ejecutar_tests') {
+                        steps {
+                            sh 'python3 manage.py test'
+                        }
+                    }
+                }
+            }
+        }
+        stage("Construir_y_subir_imagen") {
+            agent any
+            steps {
+                script {
+                    stage('Construir_imagen') {
+                        steps {
+                            sh 'docker build -t ${IMAGEN} .'
+                        }
+                    }
+                    stage('Subir_imagen') {
+                        steps {
+                            withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
+                                sh 'docker login -u ${USERNAME} -p ${PASSWORD}'
+                                sh 'docker push ${IMAGEN}'
+                            }
+                        }
+                    }
+                    stage('Limpiar_imagen') {
+                        steps {
+                            sh 'docker rmi ${IMAGEN}'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
